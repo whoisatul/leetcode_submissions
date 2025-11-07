@@ -1,0 +1,52 @@
+name: Auto Sync LeetCode Solutions
+
+on:
+  schedule:
+    - cron: "0 */6 * * *"   # runs every 6 hours
+  workflow_dispatch:         # allows manual trigger
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install leetcode-cli
+        run: |
+          npm install -g leetcode-cli
+          leetcode user -l
+
+      - name: Configure LeetCode session
+        env:
+          LEETCODE_SESSION: ${{ secrets.LEETCODE_SESSION }}
+          CSRFTOKEN: ${{ secrets.CSRFTOKEN }}
+        run: |
+          mkdir -p ~/.lc
+          echo "{" > ~/.lc/config.json
+          echo "  \"cookies\": {" >> ~/.lc/config.json
+          echo "    \"LEETCODE_SESSION\": \"${LEETCODE_SESSION}\"," >> ~/.lc/config.json
+          echo "    \"csrftoken\": \"${CSRFTOKEN}\"" >> ~/.lc/config.json
+          echo "  }," >> ~/.lc/config.json
+          echo "  \"language\": \"python3\"" >> ~/.lc/config.json
+          echo "}" >> ~/.lc/config.json
+
+      - name: Export submissions
+        run: |
+          leetcode list
+          mkdir -p submissions
+          leetcode show -x -o submissions/
+
+      - name: Commit & push changes
+        run: |
+          git config user.name "leetcode-bot"
+          git config user.email "actions@github.com"
+          git add submissions || true
+          git commit -m "Auto update LeetCode submissions" || echo "No new changes"
+          git push
